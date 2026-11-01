@@ -21,10 +21,12 @@ import java.util.Locale;
 public class PvpTestMod implements ClientModInitializer {
     private static KeyMapping toggleClicker;
     private static KeyMapping toggleEsp;
+    private static Object lastPlayer;
 
     @Override
     public void onInitializeClient() {
         Config.load();
+        System.out.println("[pvptest] loaded (client init)");
 
         KeyMapping.Category category =
                 KeyMapping.Category.register(Identifier.fromNamespaceAndPath("pvptest", "main"));
@@ -34,6 +36,11 @@ public class PvpTestMod implements ClientModInitializer {
                 "key.pvptest.esp", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, category));
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+            if (mc.player != null && mc.player != lastPlayer) {
+                lastPlayer = mc.player;
+                mc.player.sendSystemMessage(Component.literal(
+                        "[PvPTest] loaded. R = autoclicker, H = ESP. Try /ac status"));
+            }
             while (toggleClicker.consumeClick()) {
                 Config c = Config.get();
                 c.autoclickerEnabled = !c.autoclickerEnabled;
@@ -77,6 +84,10 @@ public class PvpTestMod implements ClientModInitializer {
                             c.onlyOnEntity, c.clickOnBlocks, c.weaponOnly, c.pauseWhileUsing));
                     return 1;
                 })
+                .then(ClientCommands.literal("status").executes(ctx -> {
+                    reply(ctx.getSource(), "clicker: " + AutoClicker.status);
+                    return 1;
+                }))
                 .then(ClientCommands.literal("toggle").executes(ctx -> {
                     Config c = Config.get();
                     c.autoclickerEnabled = !c.autoclickerEnabled;

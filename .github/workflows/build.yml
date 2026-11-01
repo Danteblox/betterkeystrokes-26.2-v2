@@ -25,6 +25,17 @@ jobs:
       - name: Build
         run: gradle build --no-daemon
 
+      - name: Inspect APIs
+        if: always()
+        run: |
+          set +e
+          MC=/home/runner/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar
+          echo "##### MouseHandler"; javap -cp $MC -p net.minecraft.client.MouseHandler | grep -E "onButton|onPress|isMouseGrabbed|isLeftPressed|isRightPressed|class "
+          echo "##### MouseButtonInfo"; javap -cp $MC -p net.minecraft.client.input.MouseButtonInfo 2>&1 | head -12
+          echo "##### MouseButtonEvent"; javap -cp $MC -p net.minecraft.client.input.MouseButtonEvent 2>&1 | head -12
+          echo "##### Window handle"; javap -cp $MC -p com.mojang.blaze3d.platform.Window | grep -E "handle|getWindow"
+          echo "##### Minecraft getWindow/mouseHandler"; javap -cp $MC -p net.minecraft.client.Minecraft | grep -E "getWindow|mouseHandler|window;"
+          echo "##### KeyMapping static"; javap -cp $MC -p net.minecraft.client.KeyMapping | grep -E "static .*(click|set|release|setAll)"
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
