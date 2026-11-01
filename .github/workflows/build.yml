@@ -28,18 +28,14 @@ jobs:
           set +e
           MC=/home/runner/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar
           M=/home/runner/.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api
-          echo "##### KEYMAPPING API JAR"; unzip -l $(find $M/fabric-key-mapping-api-v1 -name '*.jar' ! -name '*sources*' | head -1) | grep -E "\.class" | awk '{print $4}' | grep -v "/impl/\|/mixin/"
-          echo "##### COMMAND API JAR"; unzip -l $(find $M/fabric-command-api-v2 -name '*.jar' ! -name '*sources*' | head -1) | grep -E "\.class" | awk '{print $4}' | grep -v "/impl/\|/mixin/"
-          echo "##### LIFECYCLE CLIENT"; unzip -l $(find $M/fabric-lifecycle-events-v1 -name '*.jar' ! -name '*sources*' | head -1) | grep -E "client/" | awk '{print $4}' | grep -v "/impl/\|/mixin/" | head -20
-          echo "##### Minecraft fields/methods returning Screen or Gui"; javap -cp $MC -p net.minecraft.client.Minecraft | grep -E "Screen |Gui |gui|screen\(" | head -20
-          echo "##### Gui members with Screen"; javap -cp $MC -p net.minecraft.client.gui.Gui | grep -E "Screen" | head -10
-          echo "##### Category"; javap -cp $MC -p 'net.minecraft.client.KeyMapping$Category'
-          echo "##### Identifier"; javap -cp $MC net.minecraft.resources.Identifier | grep -E "fromNamespaceAndPath|class " | head
-          echo "##### Entity.getTeamColor"; javap -cp $MC -p net.minecraft.world.entity.Entity | grep -E "getTeamColor|isInvisible|distanceToSqr"
-          echo "##### Options keys"; javap -cp $MC -p net.minecraft.client.Options | grep -E " keyAttack| keyUse"
-          echo "##### Minecraft hitResult/mouseHandler/player/level"; javap -cp $MC -p net.minecraft.client.Minecraft | grep -E " hitResult| mouseHandler| player;| level;| options;"
-          echo "##### MouseHandler"; javap -cp $MC -p net.minecraft.client.MouseHandler | grep -E "isMouseGrabbed"
-          echo "##### ItemTags"; javap -cp $MC -p net.minecraft.tags.ItemTags | grep -E " SWORDS| AXES"
+          KM=$(find $M/fabric-key-mapping-api-v1 -name '*.jar' ! -name '*sources*' | head -1)
+          CM=$(find $M/fabric-command-api-v2 -name '*.jar' ! -name '*sources*' | head -1)
+          LC=$(find $M/fabric-lifecycle-events-v1 -name '*.jar' ! -name '*sources*' | head -1)
+          echo "##### KeyMappingHelper"; javap -cp "$KM:$MC" net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
+          echo "##### ClientCommands"; javap -cp "$CM:$MC" net.fabricmc.fabric.api.client.command.v2.ClientCommands
+          echo "##### FabricClientCommandSource"; javap -cp "$CM:$MC" net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource | grep -iE "send|feedback"
+          echo "##### ClientCommandRegistrationCallback"; javap -cp "$CM:$MC" net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback
+          echo "##### ClientTickEvents"; javap -cp "$LC:$MC" net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:

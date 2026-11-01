@@ -5,11 +5,11 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -28,9 +28,9 @@ public class PvpTestMod implements ClientModInitializer {
 
         KeyMapping.Category category =
                 KeyMapping.Category.register(Identifier.fromNamespaceAndPath("pvptest", "main"));
-        toggleClicker = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        toggleClicker = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.pvptest.autoclicker", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, category));
-        toggleEsp = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        toggleEsp = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.pvptest.esp", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, category));
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
@@ -57,7 +57,7 @@ public class PvpTestMod implements ClientModInitializer {
 
     private static void status(Minecraft mc, String msg) {
         if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("[PvPTest] " + msg), true);
+            mc.player.sendOverlayMessage(Component.literal("[PvPTest] " + msg));
         }
     }
 
@@ -67,7 +67,7 @@ public class PvpTestMod implements ClientModInitializer {
 
     private static void registerAutoclickerCommands(
             com.mojang.brigadier.CommandDispatcher<FabricClientCommandSource> d) {
-        d.register(ClientCommandManager.literal("ac")
+        d.register(ClientCommands.literal("ac")
                 .executes(ctx -> {
                     Config c = Config.get();
                     reply(ctx.getSource(), String.format(Locale.ROOT,
@@ -77,16 +77,16 @@ public class PvpTestMod implements ClientModInitializer {
                             c.onlyOnEntity, c.clickOnBlocks, c.weaponOnly, c.pauseWhileUsing));
                     return 1;
                 })
-                .then(ClientCommandManager.literal("toggle").executes(ctx -> {
+                .then(ClientCommands.literal("toggle").executes(ctx -> {
                     Config c = Config.get();
                     c.autoclickerEnabled = !c.autoclickerEnabled;
                     Config.save();
                     reply(ctx.getSource(), "Autoclicker " + (c.autoclickerEnabled ? "ON" : "OFF"));
                     return 1;
                 }))
-                .then(ClientCommandManager.literal("cps")
-                        .then(ClientCommandManager.argument("min", DoubleArgumentType.doubleArg(1, 20))
-                                .then(ClientCommandManager.argument("max", DoubleArgumentType.doubleArg(1, 20))
+                .then(ClientCommands.literal("cps")
+                        .then(ClientCommands.argument("min", DoubleArgumentType.doubleArg(1, 20))
+                                .then(ClientCommands.argument("max", DoubleArgumentType.doubleArg(1, 20))
                                         .executes(ctx -> {
                                             Config c = Config.get();
                                             c.minCps = DoubleArgumentType.getDouble(ctx, "min");
@@ -96,16 +96,16 @@ public class PvpTestMod implements ClientModInitializer {
                                                     "CPS %.1f-%.1f", c.minCps, c.maxCps));
                                             return 1;
                                         }))))
-                .then(ClientCommandManager.literal("jitter")
-                        .then(ClientCommandManager.argument("value", DoubleArgumentType.doubleArg(0, 0.5))
+                .then(ClientCommands.literal("jitter")
+                        .then(ClientCommands.argument("value", DoubleArgumentType.doubleArg(0, 0.5))
                                 .executes(ctx -> {
                                     Config.get().jitter = DoubleArgumentType.getDouble(ctx, "value");
                                     Config.save();
                                     reply(ctx.getSource(), "Jitter set");
                                     return 1;
                                 })))
-                .then(ClientCommandManager.literal("mode")
-                        .then(ClientCommandManager.argument("mode", StringArgumentType.word())
+                .then(ClientCommands.literal("mode")
+                        .then(ClientCommands.argument("mode", StringArgumentType.word())
                                 .suggests((ctx, b) -> {
                                     b.suggest("hold");
                                     b.suggest("auto");
@@ -118,8 +118,8 @@ public class PvpTestMod implements ClientModInitializer {
                                     reply(ctx.getSource(), "Mode " + Config.get().mode);
                                     return 1;
                                 })))
-                .then(ClientCommandManager.literal("button")
-                        .then(ClientCommandManager.argument("button", StringArgumentType.word())
+                .then(ClientCommands.literal("button")
+                        .then(ClientCommands.argument("button", StringArgumentType.word())
                                 .suggests((ctx, b) -> {
                                     b.suggest("left");
                                     b.suggest("right");
@@ -140,7 +140,7 @@ public class PvpTestMod implements ClientModInitializer {
 
     private static void registerEspCommands(
             com.mojang.brigadier.CommandDispatcher<FabricClientCommandSource> d) {
-        d.register(ClientCommandManager.literal("esp")
+        d.register(ClientCommands.literal("esp")
                 .executes(ctx -> {
                     Config c = Config.get();
                     reply(ctx.getSource(), String.format(Locale.ROOT,
@@ -148,15 +148,15 @@ public class PvpTestMod implements ClientModInitializer {
                             c.espEnabled, c.espColor, c.espMaxDistance, c.espInvisible));
                     return 1;
                 })
-                .then(ClientCommandManager.literal("toggle").executes(ctx -> {
+                .then(ClientCommands.literal("toggle").executes(ctx -> {
                     Config c = Config.get();
                     c.espEnabled = !c.espEnabled;
                     Config.save();
                     reply(ctx.getSource(), "ESP " + (c.espEnabled ? "ON" : "OFF"));
                     return 1;
                 }))
-                .then(ClientCommandManager.literal("color")
-                        .then(ClientCommandManager.argument("hex", StringArgumentType.word())
+                .then(ClientCommands.literal("color")
+                        .then(ClientCommands.argument("hex", StringArgumentType.word())
                                 .executes(ctx -> {
                                     String s = StringArgumentType.getString(ctx, "hex");
                                     if (s.startsWith("#")) s = s.substring(1);
@@ -170,8 +170,8 @@ public class PvpTestMod implements ClientModInitializer {
                                         return 0;
                                     }
                                 })))
-                .then(ClientCommandManager.literal("distance")
-                        .then(ClientCommandManager.argument("blocks", DoubleArgumentType.doubleArg(0, 512))
+                .then(ClientCommands.literal("distance")
+                        .then(ClientCommands.argument("blocks", DoubleArgumentType.doubleArg(0, 512))
                                 .executes(ctx -> {
                                     Config.get().espMaxDistance = DoubleArgumentType.getDouble(ctx, "blocks");
                                     Config.save();
@@ -183,8 +183,8 @@ public class PvpTestMod implements ClientModInitializer {
 
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<FabricClientCommandSource> boolOption(
             String literal, String label, java.util.function.Consumer<Boolean> setter) {
-        return ClientCommandManager.literal(literal)
-                .then(ClientCommandManager.argument("value", BoolArgumentType.bool())
+        return ClientCommands.literal(literal)
+                .then(ClientCommands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> {
                             boolean v = BoolArgumentType.getBool(ctx, "value");
                             setter.accept(v);

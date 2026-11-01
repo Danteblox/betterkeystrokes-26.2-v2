@@ -22,7 +22,7 @@ public final class AutoClicker {
             nextClickNs = 0;
             return;
         }
-        if (mc.player == null || mc.level == null || mc.screen != null || !mc.mouseHandler.isMouseGrabbed()) {
+        if (mc.player == null || mc.level == null || mc.gui.screen() != null || !mc.mouseHandler.isMouseGrabbed()) {
             nextClickNs = 0;
             return;
         }
