@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "MinecraftAccessor",
+    "MouseHandlerAccessor",
     "MinecraftEspMixin",
     "EntityTeamColorMixin"
   ],

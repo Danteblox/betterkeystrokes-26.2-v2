@@ -1,6 +1,9 @@
 package dev.local.pvptest;
 
 import dev.local.pvptest.mixin.MinecraftAccessor;
+import dev.local.pvptest.mixin.MouseHandlerAccessor;
+import net.minecraft.client.input.MouseButtonInfo;
+import org.lwjgl.glfw.GLFW;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.tags.ItemTags;
@@ -41,7 +44,10 @@ public final class AutoClicker {
         boolean right = c.button == Config.Button.RIGHT;
         KeyMapping key = right ? mc.options.keyUse : mc.options.keyAttack;
 
-        if (c.mode == Config.Mode.HOLD && !key.isDown()) {
+        int glfwButton = right ? GLFW.GLFW_MOUSE_BUTTON_RIGHT : GLFW.GLFW_MOUSE_BUTTON_LEFT;
+        boolean keyDown = key.isDown();
+        boolean physicalDown = GLFW.glfwGetMouseButton(mc.getWindow().handle(), glfwButton) == GLFW.GLFW_PRESS;
+        if (c.mode == Config.Mode.HOLD && !keyDown && !physicalDown) {
             status = "HOLD mode: attack button not held (try /ac mode auto)";
             nextClickNs = 0;
             return;
@@ -87,11 +93,25 @@ public final class AutoClicker {
         // accumulate from the previous deadline so the average rate matches the target CPS
         nextClickNs += nextDelayNs(c);
 
-        MinecraftAccessor acc = (MinecraftAccessor) mc;
-        if (right) {
-            acc.pvptest$startUseItem();
+        if (c.input == Config.Input.REAL) {
+            MouseHandlerAccessor mh = (MouseHandlerAccessor) mc.mouseHandler;
+            long window = mc.getWindow().handle();
+            MouseButtonInfo info = new MouseButtonInfo(glfwButton, 0);
+            if (keyDown) {
+                // button is held: release then press so it ends held, with one counted press
+                mh.pvptest$onButton(window, info, GLFW.GLFW_RELEASE);
+                mh.pvptest$onButton(window, info, GLFW.GLFW_PRESS);
+            } else {
+                mh.pvptest$onButton(window, info, GLFW.GLFW_PRESS);
+                mh.pvptest$onButton(window, info, GLFW.GLFW_RELEASE);
+            }
         } else {
-            acc.pvptest$startAttack();
+            MinecraftAccessor acc = (MinecraftAccessor) mc;
+            if (right) {
+                acc.pvptest$startUseItem();
+            } else {
+                acc.pvptest$startAttack();
+            }
         }
         totalClicks++;
         status = "clicking (" + totalClicks + " total)";

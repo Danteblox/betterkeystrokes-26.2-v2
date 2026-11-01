@@ -14,12 +14,15 @@ import java.nio.file.Path;
 public class Config {
     public enum Mode { HOLD, AUTO }
     public enum Button { LEFT, RIGHT }
+    /** REAL: sends real mouse press/release events (CPS counters and other mods see them). DIRECT: calls the attack action directly. */
+    public enum Input { REAL, DIRECT }
 
     // ---- Autoclicker ----
     public boolean autoclickerEnabled = false;
     /** HOLD: clicks only while you hold the mouse button. AUTO: clicks continuously while enabled. */
     public Mode mode = Mode.HOLD;
     public Button button = Button.LEFT;
+    public Input input = Input.REAL;
     public double minCps = 8.0;
     public double maxCps = 12.0;
     /** Extra random variation applied to each delay, as a fraction of the delay (0.0 - 0.5). */
@@ -79,6 +82,7 @@ public class Config {
     private void sanitize() {
         if (mode == null) mode = Mode.HOLD;
         if (button == null) button = Button.LEFT;
+        if (input == null) input = Input.REAL;
         minCps = Math.max(1.0, Math.min(minCps, 20.0));
         maxCps = Math.max(minCps, Math.min(maxCps, 20.0));
         jitter = Math.max(0.0, Math.min(jitter, 0.5));

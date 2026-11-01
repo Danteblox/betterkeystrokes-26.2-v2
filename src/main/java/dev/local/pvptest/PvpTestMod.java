@@ -129,6 +129,20 @@ public class PvpTestMod implements ClientModInitializer {
                                     reply(ctx.getSource(), "Mode " + Config.get().mode);
                                     return 1;
                                 })))
+                .then(ClientCommands.literal("input")
+                        .then(ClientCommands.argument("input", StringArgumentType.word())
+                                .suggests((ctx, b) -> {
+                                    b.suggest("real");
+                                    b.suggest("direct");
+                                    return b.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    String m = StringArgumentType.getString(ctx, "input").toLowerCase(Locale.ROOT);
+                                    Config.get().input = m.equals("direct") ? Config.Input.DIRECT : Config.Input.REAL;
+                                    Config.save();
+                                    reply(ctx.getSource(), "Input " + Config.get().input);
+                                    return 1;
+                                })))
                 .then(ClientCommands.literal("button")
                         .then(ClientCommands.argument("button", StringArgumentType.word())
                                 .suggests((ctx, b) -> {
