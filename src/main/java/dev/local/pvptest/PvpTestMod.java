@@ -1,0 +1,196 @@
+package dev.local.pvptest;
+
+import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import org.lwjgl.glfw.GLFW;
+
+import java.util.Locale;
+
+public class PvpTestMod implements ClientModInitializer {
+    private static KeyMapping toggleClicker;
+    private static KeyMapping toggleEsp;
+
+    @Override
+    public void onInitializeClient() {
+        Config.load();
+
+        KeyMapping.Category category =
+                KeyMapping.Category.register(Identifier.fromNamespaceAndPath("pvptest", "main"));
+        toggleClicker = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.pvptest.autoclicker", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, category));
+        toggleEsp = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.pvptest.esp", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, category));
+
+        ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+            while (toggleClicker.consumeClick()) {
+                Config c = Config.get();
+                c.autoclickerEnabled = !c.autoclickerEnabled;
+                Config.save();
+                status(mc, "Autoclicker " + (c.autoclickerEnabled ? "ON" : "OFF"));
+            }
+            while (toggleEsp.consumeClick()) {
+                Config c = Config.get();
+                c.espEnabled = !c.espEnabled;
+                Config.save();
+                status(mc, "ESP " + (c.espEnabled ? "ON" : "OFF"));
+            }
+            AutoClicker.tick(mc);
+        });
+
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+            registerAutoclickerCommands(dispatcher);
+            registerEspCommands(dispatcher);
+        });
+    }
+
+    private static void status(Minecraft mc, String msg) {
+        if (mc.player != null) {
+            mc.player.displayClientMessage(Component.literal("[PvPTest] " + msg), true);
+        }
+    }
+
+    private static void reply(FabricClientCommandSource src, String msg) {
+        src.sendFeedback(Component.literal("[PvPTest] " + msg));
+    }
+
+    private static void registerAutoclickerCommands(
+            com.mojang.brigadier.CommandDispatcher<FabricClientCommandSource> d) {
+        d.register(ClientCommandManager.literal("ac")
+                .executes(ctx -> {
+                    Config c = Config.get();
+                    reply(ctx.getSource(), String.format(Locale.ROOT,
+                            "enabled=%b mode=%s button=%s cps=%.1f-%.1f jitter=%.2f onlyOnEntity=%b "
+                                    + "clickOnBlocks=%b weaponOnly=%b pauseWhileUsing=%b",
+                            c.autoclickerEnabled, c.mode, c.button, c.minCps, c.maxCps, c.jitter,
+                            c.onlyOnEntity, c.clickOnBlocks, c.weaponOnly, c.pauseWhileUsing));
+                    return 1;
+                })
+                .then(ClientCommandManager.literal("toggle").executes(ctx -> {
+                    Config c = Config.get();
+                    c.autoclickerEnabled = !c.autoclickerEnabled;
+                    Config.save();
+                    reply(ctx.getSource(), "Autoclicker " + (c.autoclickerEnabled ? "ON" : "OFF"));
+                    return 1;
+                }))
+                .then(ClientCommandManager.literal("cps")
+                        .then(ClientCommandManager.argument("min", DoubleArgumentType.doubleArg(1, 20))
+                                .then(ClientCommandManager.argument("max", DoubleArgumentType.doubleArg(1, 20))
+                                        .executes(ctx -> {
+                                            Config c = Config.get();
+                                            c.minCps = DoubleArgumentType.getDouble(ctx, "min");
+                                            c.maxCps = DoubleArgumentType.getDouble(ctx, "max");
+                                            Config.save();
+                                            reply(ctx.getSource(), String.format(Locale.ROOT,
+                                                    "CPS %.1f-%.1f", c.minCps, c.maxCps));
+                                            return 1;
+                                        }))))
+                .then(ClientCommandManager.literal("jitter")
+                        .then(ClientCommandManager.argument("value", DoubleArgumentType.doubleArg(0, 0.5))
+                                .executes(ctx -> {
+                                    Config.get().jitter = DoubleArgumentType.getDouble(ctx, "value");
+                                    Config.save();
+                                    reply(ctx.getSource(), "Jitter set");
+                                    return 1;
+                                })))
+                .then(ClientCommandManager.literal("mode")
+                        .then(ClientCommandManager.argument("mode", StringArgumentType.word())
+                                .suggests((ctx, b) -> {
+                                    b.suggest("hold");
+                                    b.suggest("auto");
+                                    return b.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    String m = StringArgumentType.getString(ctx, "mode").toLowerCase(Locale.ROOT);
+                                    Config.get().mode = m.equals("auto") ? Config.Mode.AUTO : Config.Mode.HOLD;
+                                    Config.save();
+                                    reply(ctx.getSource(), "Mode " + Config.get().mode);
+                                    return 1;
+                                })))
+                .then(ClientCommandManager.literal("button")
+                        .then(ClientCommandManager.argument("button", StringArgumentType.word())
+                                .suggests((ctx, b) -> {
+                                    b.suggest("left");
+                                    b.suggest("right");
+                                    return b.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    String m = StringArgumentType.getString(ctx, "button").toLowerCase(Locale.ROOT);
+                                    Config.get().button = m.equals("right") ? Config.Button.RIGHT : Config.Button.LEFT;
+                                    Config.save();
+                                    reply(ctx.getSource(), "Button " + Config.get().button);
+                                    return 1;
+                                })))
+                .then(boolOption("onlyonentity", "onlyOnEntity", v -> Config.get().onlyOnEntity = v))
+                .then(boolOption("clickonblocks", "clickOnBlocks", v -> Config.get().clickOnBlocks = v))
+                .then(boolOption("weapononly", "weaponOnly", v -> Config.get().weaponOnly = v))
+                .then(boolOption("pausewhileusing", "pauseWhileUsing", v -> Config.get().pauseWhileUsing = v)));
+    }
+
+    private static void registerEspCommands(
+            com.mojang.brigadier.CommandDispatcher<FabricClientCommandSource> d) {
+        d.register(ClientCommandManager.literal("esp")
+                .executes(ctx -> {
+                    Config c = Config.get();
+                    reply(ctx.getSource(), String.format(Locale.ROOT,
+                            "enabled=%b color=%06X distance=%.0f invisible=%b",
+                            c.espEnabled, c.espColor, c.espMaxDistance, c.espInvisible));
+                    return 1;
+                })
+                .then(ClientCommandManager.literal("toggle").executes(ctx -> {
+                    Config c = Config.get();
+                    c.espEnabled = !c.espEnabled;
+                    Config.save();
+                    reply(ctx.getSource(), "ESP " + (c.espEnabled ? "ON" : "OFF"));
+                    return 1;
+                }))
+                .then(ClientCommandManager.literal("color")
+                        .then(ClientCommandManager.argument("hex", StringArgumentType.word())
+                                .executes(ctx -> {
+                                    String s = StringArgumentType.getString(ctx, "hex");
+                                    if (s.startsWith("#")) s = s.substring(1);
+                                    try {
+                                        Config.get().espColor = Integer.parseInt(s, 16) & 0xFFFFFF;
+                                        Config.save();
+                                        reply(ctx.getSource(), "Color #" + s.toUpperCase(Locale.ROOT));
+                                        return 1;
+                                    } catch (NumberFormatException e) {
+                                        reply(ctx.getSource(), "Use a hex color like ff0000");
+                                        return 0;
+                                    }
+                                })))
+                .then(ClientCommandManager.literal("distance")
+                        .then(ClientCommandManager.argument("blocks", DoubleArgumentType.doubleArg(0, 512))
+                                .executes(ctx -> {
+                                    Config.get().espMaxDistance = DoubleArgumentType.getDouble(ctx, "blocks");
+                                    Config.save();
+                                    reply(ctx.getSource(), "Distance set (0 = unlimited)");
+                                    return 1;
+                                })))
+                .then(boolOption("invisible", "invisible", v -> Config.get().espInvisible = v)));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<FabricClientCommandSource> boolOption(
+            String literal, String label, java.util.function.Consumer<Boolean> setter) {
+        return ClientCommandManager.literal(literal)
+                .then(ClientCommandManager.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> {
+                            boolean v = BoolArgumentType.getBool(ctx, "value");
+                            setter.accept(v);
+                            Config.save();
+                            reply(ctx.getSource(), label + " = " + v);
+                            return 1;
+                        }));
+    }
+}
