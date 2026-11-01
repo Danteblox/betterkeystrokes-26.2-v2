@@ -26,17 +26,20 @@ jobs:
         if: always()
         run: |
           set +e
-          echo "== candidate jars"
-          find ~/.gradle -name '*.jar' ! -name '*sources*' \( -path '*loom*' -o -path '*fabric-api*' -o -path '*net.fabricmc*' \) | head -80
-          MC=$(find ~/.gradle -name '*.jar' ! -name '*sources*' -size +20M | grep -iE 'minecraft|loom' | head -1)
-          echo "MC jar: $MC"
-          for c in net.minecraft.client.Minecraft net.minecraft.client.player.LocalPlayer net.minecraft.client.KeyMapping 'net.minecraft.client.KeyMapping$Category' net.minecraft.world.entity.Entity net.minecraft.world.entity.player.Player; do
-            echo "=== $c"; javap -cp "$MC" -p "$c" 2>&1 | grep -iE "screen|startAttack|startUseItem|shouldEntityAppearGlowing|getTeamColor|Message|overlay|Category|register|KeyMapping\(|keyAttack|keyUse|isDown|consumeClick|class |interface " | head -40
-          done
-          echo "== fabric api classes"
-          for j in $(find ~/.gradle -name '*.jar' ! -name '*sources*' -path '*fabric*' | head -200); do
-            unzip -l "$j" 2>/dev/null | grep -iE "ClientCommand|KeyBinding|KeyMapping|ClientTickEvents|ClientModInitializer" | sed "s#^#$(basename $j): #"
-          done | head -60
+          MC=/home/runner/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar
+          M=/home/runner/.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api
+          echo "##### KEYMAPPING API JAR"; unzip -l $(find $M/fabric-key-mapping-api-v1 -name '*.jar' ! -name '*sources*' | head -1) | grep -E "\.class" | awk '{print $4}' | grep -v "/impl/\|/mixin/"
+          echo "##### COMMAND API JAR"; unzip -l $(find $M/fabric-command-api-v2 -name '*.jar' ! -name '*sources*' | head -1) | grep -E "\.class" | awk '{print $4}' | grep -v "/impl/\|/mixin/"
+          echo "##### LIFECYCLE CLIENT"; unzip -l $(find $M/fabric-lifecycle-events-v1 -name '*.jar' ! -name '*sources*' | head -1) | grep -E "client/" | awk '{print $4}' | grep -v "/impl/\|/mixin/" | head -20
+          echo "##### Minecraft fields/methods returning Screen or Gui"; javap -cp $MC -p net.minecraft.client.Minecraft | grep -E "Screen |Gui |gui|screen\(" | head -20
+          echo "##### Gui members with Screen"; javap -cp $MC -p net.minecraft.client.gui.Gui | grep -E "Screen" | head -10
+          echo "##### Category"; javap -cp $MC -p 'net.minecraft.client.KeyMapping$Category'
+          echo "##### Identifier"; javap -cp $MC net.minecraft.resources.Identifier | grep -E "fromNamespaceAndPath|class " | head
+          echo "##### Entity.getTeamColor"; javap -cp $MC -p net.minecraft.world.entity.Entity | grep -E "getTeamColor|isInvisible|distanceToSqr"
+          echo "##### Options keys"; javap -cp $MC -p net.minecraft.client.Options | grep -E " keyAttack| keyUse"
+          echo "##### Minecraft hitResult/mouseHandler/player/level"; javap -cp $MC -p net.minecraft.client.Minecraft | grep -E " hitResult| mouseHandler| player;| level;| options;"
+          echo "##### MouseHandler"; javap -cp $MC -p net.minecraft.client.MouseHandler | grep -E "isMouseGrabbed"
+          echo "##### ItemTags"; javap -cp $MC -p net.minecraft.tags.ItemTags | grep -E " SWORDS| AXES"
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
